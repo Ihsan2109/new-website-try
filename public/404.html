@@ -4,14 +4,19 @@
     <meta charset="utf-8">
     <title>Redirecting — M.S Ayurvedic Centre</title>
     <script>
-      // Single Page App redirect for GitHub Pages
+      // Single Page App redirect for GitHub Pages (handles custom domains and repo subpaths)
       const path = window.location.pathname;
       const parts = path.split('/').filter(Boolean);
-      const lastPart = parts.length > 0 ? parts[parts.length - 1] : '';
       const validPages = ['about', 'treatments', 'offers', 'reviews', 'products', 'contact', 'admin'];
-      const targetHash = validPages.includes(lastPart) ? '#' + lastPart : '';
-      const base = window.location.pathname.replace(/\/[^/]*$/, '/');
-      window.location.replace(base + targetHash + window.location.search);
+      const matchedPage = parts.find(p => validPages.includes(p.toLowerCase()));
+      const targetHash = matchedPage ? '#' + matchedPage.toLowerCase() : '';
+      
+      // If deployed at root (custom domain), rootPath is '/'
+      // If deployed at username.github.io/repo/, first part is repo name so rootPath is '/repo/'
+      const isSubpath = parts.length > 0 && !validPages.includes(parts[0].toLowerCase());
+      const rootPath = isSubpath ? '/' + parts[0] + '/' : '/';
+      
+      window.location.replace(rootPath + targetHash + window.location.search);
     </script>
   </head>
   <body>
