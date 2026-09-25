@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Redirecting — M.S Ayurvedic Centre</title>
+    <script>
+      // Single Page App redirect for GitHub Pages
+      const path = window.location.pathname;
+      const parts = path.split('/').filter(Boolean);
+      const lastPart = parts.length > 0 ? parts[parts.length - 1] : '';
+      const validPages = ['about', 'treatments', 'offers', 'reviews', 'products', 'contact', 'admin'];
+      const targetHash = validPages.includes(lastPart) ? '#' + lastPart : '';
+      const base = window.location.pathname.replace(/\/[^/]*$/, '/');
+      window.location.replace(base + targetHash + window.location.search);
+    </script>
+  </head>
+  <body>
+    <p style="font-family: sans-serif; text-align: center; padding: 50px;">Redirecting to M.S Ayurvedic Centre...</p>
+  </body>
+</html>
