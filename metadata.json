@@ -1,0 +1,6 @@
+{
+  "name": "M.S Ayurvedic Centre",
+  "description": "Bilingual consultation website for Dr. Mobin (B.U.M.S., C.M.S. Ed., M.H.T.) at M.S Ayurvedic Centre offering Ayurveda, Unani, Siddha, and certified Hijama Therapy (Blood Cupping & Dry Cupping) in Noida Delhi NCR.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
