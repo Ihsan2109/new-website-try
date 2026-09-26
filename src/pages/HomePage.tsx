@@ -15,21 +15,24 @@ import {
   Instagram,
   Facebook,
   Award,
+  Calendar,
 } from 'lucide-react';
 import { Language, PageId } from '../types';
 import { useClinic } from '../context/ClinicContext';
+import { HeroSlider } from '../components/HeroSlider';
 
 interface HomePageProps {
   lang: Language;
   onNavigate: (page: PageId) => void;
+  onOpenBooking?: () => void;
 }
 
-export const HomePage: React.FC<HomePageProps> = ({ lang, onNavigate }) => {
+export const HomePage: React.FC<HomePageProps> = ({ lang, onNavigate, onOpenBooking }) => {
   const { images, clinicInfo } = useClinic();
   return (
     <div className="space-y-16 pb-12">
       {/* Hero Section with Visual Impact */}
-      <section className="bg-gradient-to-b from-[#f5ede0] via-[#f9f5ee] to-[#fcfaf7] border-b border-[#e5dcce] pt-10 sm:pt-14 pb-14 px-4">
+      <section className="bg-gradient-to-b from-[#f5ede0] via-[#f9f5ee] to-[#fcfaf7] border-b border-[#e5dcce] pt-8 sm:pt-12 pb-14 px-4">
         <div className="max-w-6xl mx-auto">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
             {/* Left Content Column */}
@@ -55,6 +58,16 @@ export const HomePage: React.FC<HomePageProps> = ({ lang, onNavigate }) => {
               </p>
 
               <div className="flex flex-wrap items-center gap-3 pt-2">
+                {onOpenBooking ? (
+                  <button
+                    onClick={onOpenBooking}
+                    className="inline-flex items-center gap-2.5 bg-gradient-to-r from-[#214332] to-[#2c5c44] hover:from-[#193728] hover:to-[#224835] text-white px-6 py-3.5 rounded-lg font-semibold text-sm shadow-md transition-all active:scale-[0.98] border border-emerald-500/30"
+                  >
+                    <Calendar className="w-4 h-4 text-emerald-300" />
+                    <span>{lang === 'en' ? 'Book Appointment' : 'अपॉइंटमेंट बुक करें'}</span>
+                  </button>
+                ) : null}
+
                 <a
                   href={`https://wa.me/${clinicInfo.whatsapp}?text=${encodeURIComponent(
                     lang === 'en'
@@ -63,25 +76,25 @@ export const HomePage: React.FC<HomePageProps> = ({ lang, onNavigate }) => {
                   )}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-2.5 bg-[#25d366] hover:bg-[#1ebd59] text-white px-6 py-3.5 rounded-lg font-semibold text-sm shadow-md transition-all active:scale-[0.98]"
+                  className="inline-flex items-center gap-2.5 bg-[#25d366] hover:bg-[#1ebd59] text-white px-5 py-3.5 rounded-lg font-semibold text-sm shadow-md transition-all active:scale-[0.98]"
                 >
                   <MessageCircle className="w-4 h-4 fill-white" />
-                  <span>{lang === 'en' ? 'Book on WhatsApp' : 'व्हाट्सएप पर समय लें'}</span>
+                  <span>{lang === 'en' ? 'WhatsApp' : 'व्हाट्सएप'}</span>
                 </a>
 
                 <a
                   href={`tel:${clinicInfo.phone.replace(/\s+/g, '')}`}
-                  className="inline-flex items-center gap-2 bg-[#284838] hover:bg-[#1e372b] text-white px-6 py-3.5 rounded-lg font-semibold text-sm shadow-xs transition-all"
+                  className="inline-flex items-center gap-2 bg-[#284838] hover:bg-[#1e372b] text-white px-5 py-3.5 rounded-lg font-semibold text-sm shadow-xs transition-all"
                 >
                   <Phone className="w-4 h-4" />
-                  <span>{lang === 'en' ? 'Call the clinic' : 'क्लिनिक को कॉल करें'}</span>
+                  <span>{lang === 'en' ? 'Call Doctor' : 'कॉल करें'}</span>
                 </a>
 
                 <button
                   onClick={() => onNavigate('contact')}
-                  className="inline-flex items-center gap-1.5 text-sm font-medium text-[#2d523f] hover:underline px-3 py-3"
+                  className="inline-flex items-center gap-1.5 text-sm font-medium text-[#2d523f] hover:underline px-2 py-3"
                 >
-                  <span>{lang === 'en' ? 'Request via Form' : 'फ़ॉर्म द्वारा समय माँगें'}</span>
+                  <span>{lang === 'en' ? 'Clinic Details' : 'क्लिनिक विवरण'}</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </button>
               </div>
@@ -117,48 +130,9 @@ export const HomePage: React.FC<HomePageProps> = ({ lang, onNavigate }) => {
               </div>
             </div>
 
-            {/* Right Visual Image Column */}
+            {/* Right Visual 3-Images Sliding Carousel */}
             <div className="lg:col-span-5 relative">
-              <div className="relative rounded-2xl overflow-hidden border-4 border-white shadow-xl bg-[#1c3325]">
-                <div className="aspect-[4/3] sm:aspect-[16/11] relative">
-                  <img
-                    src={images.heroBanner}
-                    alt="M.S Ayurvedic Centre consultation desk"
-                    referrerPolicy="no-referrer"
-                    className="w-full h-full object-cover"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
-                  
-                  {/* Floating Doctor Card Overlay */}
-                  <div className="absolute bottom-4 left-4 right-4 p-3.5 rounded-xl bg-white/95 backdrop-blur-xs border border-[#e3dacf] shadow-md flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-[#2b513f] shrink-0 bg-[#1f372a]">
-                      <img
-                        src={images.doctorPortrait}
-                        alt="Dr. Mobin"
-                        referrerPolicy="no-referrer"
-                        className="w-full h-full object-cover object-top"
-                      />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-serif font-bold text-sm text-[#183123] truncate">
-                          {clinicInfo.doctorName[lang]}
-                        </span>
-                        <ShieldCheck className="w-3.5 h-3.5 text-[#257a4a] shrink-0" />
-                      </div>
-                      <span className="text-[11px] text-[#6b6152] block leading-tight">
-                        {clinicInfo.qualification[lang]} • 16+ {lang === 'en' ? 'Yrs Experience' : 'वर्षों का अनुभव'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Decorative Subtle Accent Tag */}
-              <div className="absolute -top-3 -right-3 hidden sm:flex items-center gap-1.5 bg-[#234331] text-[#b8f5d0] px-3.5 py-1.5 rounded-full text-xs font-semibold shadow-md border border-[#3e6b52]">
-                <Shield className="w-3.5 h-3.5 text-[#86efac]" />
-                <span>{lang === 'en' ? '100% Private & Ethical' : 'पूर्णतः गोपनीय एवं मर्यादित'}</span>
-              </div>
+              <HeroSlider lang={lang} onNavigate={onNavigate} onOpenBooking={onOpenBooking} />
             </div>
           </div>
         </div>

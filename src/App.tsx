@@ -5,6 +5,7 @@ import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 import { MobileActionBar } from './components/MobileActionBar';
 import { CartDrawer } from './components/CartDrawer';
+import { AppointmentPopup } from './components/AppointmentPopup';
 import { HomePage } from './pages/HomePage';
 import { DoctorPage } from './pages/DoctorPage';
 import { TreatmentsPage } from './pages/TreatmentsPage';
@@ -70,6 +71,23 @@ function ClinicAppContent() {
   });
 
   const [cartOpen, setCartOpen] = useState(false);
+  const [appointmentPopupOpen, setAppointmentPopupOpen] = useState(false);
+
+  // Auto-open appointment popup with smooth entrance when user opens the website
+  useEffect(() => {
+    try {
+      const alreadyShown = sessionStorage.getItem('ms_clinic_appointment_popup_shown_v1');
+      if (!alreadyShown && currentPage !== 'admin') {
+        const timer = setTimeout(() => {
+          setAppointmentPopupOpen(true);
+          sessionStorage.setItem('ms_clinic_appointment_popup_shown_v1', 'true');
+        }, 1300);
+        return () => clearTimeout(timer);
+      }
+    } catch {
+      // ignore
+    }
+  }, [currentPage]);
 
   // Sync language to URL and localStorage
   const handleToggleLang = (newLang: Language) => {
@@ -153,7 +171,13 @@ function ClinicAppContent() {
 
       {/* Main Content View */}
       <main className="flex-1" id="main">
-        {currentPage === 'home' && <HomePage lang={lang} onNavigate={handleNavigate} />}
+        {currentPage === 'home' && (
+          <HomePage
+            lang={lang}
+            onNavigate={handleNavigate}
+            onOpenBooking={() => setAppointmentPopupOpen(true)}
+          />
+        )}
         {currentPage === 'about' && <DoctorPage lang={lang} onNavigate={handleNavigate} />}
         {currentPage === 'treatments' && <TreatmentsPage lang={lang} onNavigate={handleNavigate} />}
         {currentPage === 'offers' && <OffersPage lang={lang} onNavigate={handleNavigate} />}
@@ -186,6 +210,16 @@ function ClinicAppContent() {
         onClearCart={handleClearCart}
         lang={lang}
       />
+
+      {/* Book Appointment Modal & Floating Trigger */}
+      {currentPage !== 'admin' && (
+        <AppointmentPopup
+          lang={lang}
+          isOpen={appointmentPopupOpen}
+          onClose={() => setAppointmentPopupOpen(false)}
+          onOpen={() => setAppointmentPopupOpen(true)}
+        />
+      )}
     </div>
   );
 }

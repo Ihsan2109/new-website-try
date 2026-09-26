@@ -12,6 +12,9 @@ export type PageId =
 
 export interface ClinicImagesConfig {
   heroBanner: string;
+  heroSlide1?: string;
+  heroSlide2?: string;
+  heroSlide3?: string;
   doctorPortrait: string;
   hijamaCupping: string;
   dryCupping: string;

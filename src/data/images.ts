@@ -21,6 +21,9 @@ import medicineVitality from '../assets/images/medicine_vitality_bottles_1789894
 
 export const CLINIC_IMAGES = {
   heroBanner,
+  heroSlide1: clinicExterior,
+  heroSlide2: doctorConsultation,
+  heroSlide3: realCuppingTherapy,
   doctorPortrait,
   herbalDispensary,
   herbalPreparations,

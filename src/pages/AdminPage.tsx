@@ -14,9 +14,12 @@ import {
   ShieldCheck,
   Check,
   LogOut,
+  Cloud,
+  RefreshCw,
 } from 'lucide-react';
 import { Language, PageId } from '../types';
 import { useClinic, IMAGE_METADATA_LIST } from '../context/ClinicContext';
+import { compressFile } from '../lib/imageUtils';
 
 const ADMIN_PASSWORD = 'ihsan2109';
 const AUTH_STORAGE_KEY = 'ms_clinic_admin_auth_v1';
@@ -33,6 +36,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({ lang, onNavigate }) => {
     resetImageToDefault,
     resetAllImagesToDefault,
     lastSavedAt,
+    cloudSyncStatus,
+    syncToCloud,
   } = useClinic();
 
   // Authentication State
@@ -46,6 +51,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ lang, onNavigate }) => {
   const [passwordInput, setPasswordInput] = useState('');
   const [passwordError, setPasswordError] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [isManualSyncing, setIsManualSyncing] = useState(false);
 
   // Image Editor State
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
@@ -56,6 +62,24 @@ export const AdminPage: React.FC<AdminPageProps> = ({ lang, onNavigate }) => {
   const showNotification = (message: string, type: 'success' | 'error' = 'success') => {
     setNotification({ type, message });
     setTimeout(() => setNotification(null), 4000);
+  };
+
+  const handleSyncToCloud = async () => {
+    setIsManualSyncing(true);
+    const ok = await syncToCloud();
+    setIsManualSyncing(false);
+    if (ok) {
+      showNotification(
+        lang === 'en'
+          ? 'Cloud database updated! All devices and visitors will now see these images.'
+          : 'क्लाउड डेटाबेस अपडेट हो गया! अब सभी डिवाइसों व विज़िटर्स को यह बदलाव दिखेगा।'
+      );
+    } else {
+      showNotification(
+        lang === 'en' ? 'Failed to sync to cloud database.' : 'क्लाउड डेटाबेस पर सिंक विफल रहा।',
+        'error'
+      );
+    }
   };
 
   const handleLogin = (e: React.FormEvent) => {
@@ -94,7 +118,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ lang, onNavigate }) => {
   };
 
   // Convert uploaded image file into a Data URL (which acts as a persistent web link)
-  const handleFileUpload = (key: string, e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (key: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -106,31 +130,21 @@ export const AdminPage: React.FC<AdminPageProps> = ({ lang, onNavigate }) => {
       return;
     }
 
-    if (file.size > 3.5 * 1024 * 1024) {
+    try {
       showNotification(
-        lang === 'en'
-          ? 'Image is larger than 3.5MB. Please compress it or use an external web URL.'
-          : 'इमेज 3.5MB से बड़ी है। कृपया इसे कंप्रेस करें या वेब लिंक का उपयोग करें।',
-        'error'
+        lang === 'en' ? 'Optimizing photo for cloud sync...' : 'क्लाउड सिंक के लिए फ़ोटो ऑप्टिमाइज़ हो रही है...'
       );
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = reader.result as string;
+      const dataUrl = await compressFile(file, 900, 900, 0.72);
       updateImage(key, dataUrl);
       setTestedUrls((prev) => ({ ...prev, [key]: 'valid' }));
       showNotification(
         lang === 'en'
-          ? `Image uploaded & converted to web link for ${key}!`
-          : `इमेज अपलोड होकर लिंक में बदल गई (${key})!`
+          ? `Image updated and synced to all devices for ${key}!`
+          : `इमेज अपडेट होकर सभी डिवाइसों पर सिंक हो गई (${key})!`
       );
-    };
-    reader.onerror = () => {
+    } catch {
       showNotification(lang === 'en' ? 'Error reading image file' : 'फ़ाइल पढ़ने में त्रुटि', 'error');
-    };
-    reader.readAsDataURL(file);
+    }
   };
 
   const handleTestImageUrl = (key: string, url: string) => {
@@ -269,14 +283,34 @@ export const AdminPage: React.FC<AdminPageProps> = ({ lang, onNavigate }) => {
             </button>
 
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="p-1 rounded bg-[#dcfce7] text-[#166534] text-[11px] font-bold uppercase tracking-wider">
                   {lang === 'en' ? 'Images Admin' : 'इमेज एडमिन'}
                 </span>
+
+                {cloudSyncStatus === 'synced' && (
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[11px] font-medium flex items-center gap-1" title="Changes sync live to all devices">
+                    <Cloud className="w-3 h-3 text-emerald-400" />
+                    <span>{lang === 'en' ? 'Cloud Connected' : 'क्लाउड कनेक्टेड'}</span>
+                  </span>
+                )}
+                {cloudSyncStatus === 'saving' && (
+                  <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[11px] font-medium flex items-center gap-1 animate-pulse">
+                    <RefreshCw className="w-3 h-3 text-amber-400 animate-spin" />
+                    <span>{lang === 'en' ? 'Syncing Cloud...' : 'क्लाउड सिंक जारी...'}</span>
+                  </span>
+                )}
+                {cloudSyncStatus === 'error' && (
+                  <span className="px-2 py-0.5 rounded-full bg-red-500/20 text-red-300 border border-red-500/30 text-[11px] font-medium flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3 text-red-400" />
+                    <span>{lang === 'en' ? 'Sync Error' : 'सिंक त्रुटि'}</span>
+                  </span>
+                )}
+
                 {lastSavedAt && (
                   <span className="text-[11px] text-[#a4c2b0] flex items-center gap-1">
                     <Check className="w-3 h-3 text-[#86efac]" />
-                    <span>{lang === 'en' ? `Auto-saved at ${lastSavedAt}` : `सहेजा गया: ${lastSavedAt}`}</span>
+                    <span>{lang === 'en' ? `Saved: ${lastSavedAt}` : `सहेजा गया: ${lastSavedAt}`}</span>
                   </span>
                 )}
               </div>
@@ -289,6 +323,16 @@ export const AdminPage: React.FC<AdminPageProps> = ({ lang, onNavigate }) => {
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={handleSyncToCloud}
+              disabled={isManualSyncing}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[#3d694f] hover:bg-[#497c5e] text-xs font-semibold text-white transition-all shadow-sm active:scale-95 disabled:opacity-50"
+              title="Force sync changes to Firebase Cloud so all devices update"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isManualSyncing ? 'animate-spin' : ''}`} />
+              <span>{lang === 'en' ? 'Sync to All Devices' : 'सभी डिवाइस सिंक करें'}</span>
+            </button>
+
             <button
               onClick={() => onNavigate('home')}
               className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[#2f5540] hover:bg-[#3c6b52] text-xs font-semibold text-white transition-colors"

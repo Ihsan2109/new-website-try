@@ -1,7 +1,9 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { CLINIC_IMAGES } from '../data/images';
 import { CLINIC_INFO } from '../data/content';
 import { ClinicImagesConfig, AnnouncementConfig } from '../types';
+import { db, doc, setDoc, onSnapshot, collection, deleteDoc, getDocs } from '../lib/firebase';
+import { compressDataUrl } from '../lib/imageUtils';
 
 export type ClinicInfoType = typeof CLINIC_INFO;
 
@@ -16,6 +18,33 @@ export interface ImageMeta {
 }
 
 export const IMAGE_METADATA_LIST: ImageMeta[] = [
+  {
+    key: 'heroSlide1',
+    titleEn: 'Hero Slide 1: Clinic Front & Center',
+    titleHi: 'हीरो स्लाइड 1: क्लिनिक प्रवेश द्वार व मुख्य केंद्र',
+    descriptionEn: 'First image shown in the animated 3-photo slider on the Home Page banner.',
+    descriptionHi: 'होम पेज के 3-फ़ोटो स्लाइडर में सबसे पहले दिखाई देने वाली मुख्य तस्वीर।',
+    recommendedAspect: '16:10 or 16:9 Landscape',
+    usagePages: ['Home Slider (Slide 1)'],
+  },
+  {
+    key: 'heroSlide2',
+    titleEn: 'Hero Slide 2: Dr. Mobin Consultation Chamber',
+    titleHi: 'हीरो स्लाइड 2: डॉ. मोबिन परामर्श कक्ष',
+    descriptionEn: 'Second image shown in the animated Home Page slider showing personal doctor consultation.',
+    descriptionHi: 'होम पेज स्लाइडर में दूसरी तस्वीर — डॉ. मोबिन का व्यक्तिगत परामर्श कक्ष।',
+    recommendedAspect: '16:10 or 16:9 Landscape',
+    usagePages: ['Home Slider (Slide 2)'],
+  },
+  {
+    key: 'heroSlide3',
+    titleEn: 'Hero Slide 3: Hijama Cupping & Herbal Medicines',
+    titleHi: 'हीरो स्लाइड 3: हिजामा कपिंग थेरेपी व शुद्ध औषधियां',
+    descriptionEn: 'Third image in the Home Page slider showing authentic clinical Hijama and herbal remedies.',
+    descriptionHi: 'होम पेज स्लाइडर में तीसरी तस्वीर — प्रामाणिक हिजामा कपिंग थेरेपी व औषधीय योग।',
+    recommendedAspect: '16:10 or 16:9 Landscape',
+    usagePages: ['Home Slider (Slide 3)'],
+  },
   {
     key: 'heroBanner',
     titleEn: 'Main Hero Consultation Banner (Clinic Storefront)',
@@ -155,6 +184,8 @@ interface ClinicContextType {
   importSettingsJSON: (jsonString: string) => { success: boolean; message: string };
   hasCustomChanges: boolean;
   lastSavedAt: string | null;
+  cloudSyncStatus: 'synced' | 'saving' | 'offline' | 'error';
+  syncToCloud: () => Promise<boolean>;
 }
 
 const ClinicContext = createContext<ClinicContextType | undefined>(undefined);
@@ -188,8 +219,6 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             doctorName: { ...CLINIC_INFO.doctorName, ...parsed.clinicInfo.doctorName },
             qualification: { ...CLINIC_INFO.qualification, ...parsed.clinicInfo.qualification },
             university: { ...CLINIC_INFO.university, ...parsed.clinicInfo.university },
-            registrationNumber: { ...CLINIC_INFO.registrationNumber, ...parsed.clinicInfo.registrationNumber },
-            council: { ...CLINIC_INFO.council, ...parsed.clinicInfo.council },
             practiceSince: { ...CLINIC_INFO.practiceSince, ...parsed.clinicInfo.practiceSince },
             languages: { ...CLINIC_INFO.languages, ...parsed.clinicInfo.languages },
             address: { ...CLINIC_INFO.address, ...parsed.clinicInfo.address },
@@ -240,7 +269,181 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return null;
   });
 
-  // Persist whenever images, clinicInfo, or announcement change
+  const [cloudSyncStatus, setCloudSyncStatus] = useState<'synced' | 'saving' | 'offline' | 'error'>('synced');
+  const isRemoteSyncRef = useRef(false);
+
+  // Real-time synchronization from Firebase Firestore
+  useEffect(() => {
+    let unsubConfig: (() => void) | undefined;
+    let unsubImages: (() => void) | undefined;
+
+    try {
+      // 1. Listen for Clinic Details & Announcements (tiny <5KB document)
+      const configDocRef = doc(db, 'site_config', 'main');
+      unsubConfig = onSnapshot(
+        configDocRef,
+        (snap) => {
+          if (snap.exists()) {
+            const data = snap.data();
+            isRemoteSyncRef.current = true;
+            if (data.clinicInfo && typeof data.clinicInfo === 'object') {
+              setClinicInfo((prev) => ({
+                ...prev,
+                ...data.clinicInfo,
+                name: { ...prev.name, ...(data.clinicInfo.name || {}) },
+                doctorName: { ...prev.doctorName, ...(data.clinicInfo.doctorName || {}) },
+                qualification: { ...prev.qualification, ...(data.clinicInfo.qualification || {}) },
+                university: { ...prev.university, ...(data.clinicInfo.university || {}) },
+                practiceSince: { ...prev.practiceSince, ...(data.clinicInfo.practiceSince || {}) },
+                languages: { ...prev.languages, ...(data.clinicInfo.languages || {}) },
+                address: { ...prev.address, ...(data.clinicInfo.address || {}) },
+                landmark: { ...prev.landmark, ...(data.clinicInfo.landmark || {}) },
+                parking: { ...prev.parking, ...(data.clinicInfo.parking || {}) },
+                hours: { ...prev.hours, ...(data.clinicInfo.hours || {}) },
+                social: { ...prev.social, ...(data.clinicInfo.social || {}) },
+                developer: { ...prev.developer, ...(data.clinicInfo.developer || {}) },
+              }));
+            }
+            if (data.announcement && typeof data.announcement === 'object') {
+              setAnnouncement((prev) => ({
+                ...prev,
+                ...data.announcement,
+                text: { ...prev.text, ...(data.announcement.text || {}) },
+                badge: { ...prev.badge, ...(data.announcement.badge || {}) },
+              }));
+            }
+            setCloudSyncStatus('synced');
+            if (data.updatedAt) {
+              setLastSavedAt(
+                new Date(data.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+              );
+            }
+            setTimeout(() => {
+              isRemoteSyncRef.current = false;
+            }, 300);
+          }
+        },
+        (err) => {
+          console.warn('Firestore real-time config sync notification:', err);
+          setCloudSyncStatus('offline');
+        }
+      );
+
+      // 2. Listen for customized image overrides stored in site_images collection
+      const imagesColRef = collection(db, 'site_images');
+      unsubImages = onSnapshot(
+        imagesColRef,
+        (snap) => {
+          isRemoteSyncRef.current = true;
+          const imageOverrides: Partial<ClinicImagesConfig> = {};
+          snap.forEach((docSnap) => {
+            const data = docSnap.data();
+            if (data && typeof data.url === 'string') {
+              (imageOverrides as Record<string, string>)[docSnap.id] = data.url;
+            }
+          });
+          if (Object.keys(imageOverrides).length > 0) {
+            setImages((prev) => ({ ...prev, ...imageOverrides }));
+          }
+          setCloudSyncStatus('synced');
+          setTimeout(() => {
+            isRemoteSyncRef.current = false;
+          }, 300);
+        },
+        (err) => {
+          console.warn('Firestore site_images listener:', err);
+        }
+      );
+    } catch (e) {
+      console.warn('Could not establish Firestore listeners:', e);
+      setCloudSyncStatus('offline');
+    }
+
+    return () => {
+      if (unsubConfig) unsubConfig();
+      if (unsubImages) unsubImages();
+    };
+  }, []);
+
+  // Helper to persist clinic info & announcement to site_config/main (<5KB document, avoids 1MB limit)
+  const pushClinicInfoToFirestore = async (
+    targetInfo: ClinicInfoType,
+    targetAnnouncement: AnnouncementConfig
+  ) => {
+    try {
+      const configDocRef = doc(db, 'site_config', 'main');
+      await setDoc(
+        configDocRef,
+        {
+          clinicInfo: targetInfo,
+          announcement: targetAnnouncement,
+          updatedAt: new Date().toISOString(),
+        },
+        { merge: true }
+      );
+      setCloudSyncStatus('synced');
+      return true;
+    } catch (error) {
+      console.error('Error syncing to Firestore:', error);
+      setCloudSyncStatus('error');
+      return false;
+    }
+  };
+
+  // Helper to persist single image to site_images/{key}
+  const saveImageToFirestore = async (key: string, rawUrl: string) => {
+    try {
+      setCloudSyncStatus('saving');
+      const defaultUrl = (CLINIC_IMAGES as Record<string, string>)[key];
+      if (rawUrl && rawUrl !== defaultUrl) {
+        // Compress if base64 to ensure it remains < 150KB
+        const compressedUrl = await compressDataUrl(rawUrl, 900, 900, 0.72);
+        const imageDocRef = doc(db, 'site_images', key);
+        await setDoc(imageDocRef, {
+          url: compressedUrl,
+          updatedAt: new Date().toISOString(),
+        });
+      } else {
+        // Reverted to default, delete from cloud
+        await deleteDoc(doc(db, 'site_images', key));
+      }
+      setCloudSyncStatus('synced');
+    } catch (error) {
+      console.error(`Error saving image ${key} to Firestore:`, error);
+      setCloudSyncStatus('error');
+    }
+  };
+
+  // Manual trigger to force-push all state to Firestore
+  const syncToCloud = async (): Promise<boolean> => {
+    try {
+      setCloudSyncStatus('saving');
+      // 1. Save clinic info & announcement to site_config/main
+      const okInfo = await pushClinicInfoToFirestore(clinicInfo, announcement);
+
+      // 2. Save any custom images to site_images/{key}
+      for (const [key, rawUrl] of Object.entries(images)) {
+        const url = typeof rawUrl === 'string' ? rawUrl : '';
+        const defaultUrl = (CLINIC_IMAGES as Record<string, string>)[key];
+        if (url && url !== defaultUrl) {
+          const compressed = await compressDataUrl(url, 900, 900, 0.72);
+          await setDoc(doc(db, 'site_images', key), {
+            url: compressed,
+            updatedAt: new Date().toISOString(),
+          });
+        }
+      }
+
+      setCloudSyncStatus(okInfo ? 'synced' : 'error');
+      return okInfo;
+    } catch (err) {
+      console.error('Error during syncToCloud:', err);
+      setCloudSyncStatus('error');
+      return false;
+    }
+  };
+
+  // Persist locally whenever clinicInfo or announcement change
   useEffect(() => {
     try {
       const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -252,16 +455,23 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
       setLastSavedAt(now);
+
+      // If change was made locally in this tab, update cloud config
+      if (!isRemoteSyncRef.current) {
+        pushClinicInfoToFirestore(clinicInfo, announcement);
+      }
     } catch (err) {
       console.error('Error saving admin settings to localStorage', err);
     }
-  }, [images, clinicInfo, announcement]);
+  }, [clinicInfo, announcement]);
 
   const updateImage = (key: string, url: string) => {
+    const trimmed = url.trim();
     setImages((prev) => ({
       ...prev,
-      [key]: url.trim(),
+      [key]: trimmed,
     }));
+    saveImageToFirestore(key, trimmed);
   };
 
   const updateClinicInfo = (updates: Partial<ClinicInfoType>) => {
@@ -278,26 +488,42 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }));
   };
 
-  const resetImageToDefault = (key: string) => {
+  const resetImageToDefault = async (key: string) => {
     const defaultUrl = (CLINIC_IMAGES as Record<string, string>)[key];
     if (defaultUrl) {
       setImages((prev) => ({
         ...prev,
         [key]: defaultUrl,
       }));
+      try {
+        await deleteDoc(doc(db, 'site_images', key));
+      } catch (e) {
+        console.warn(`Could not delete image ${key} from Firestore:`, e);
+      }
     }
   };
 
-  const resetAllImagesToDefault = () => {
+  const resetAllImagesToDefault = async () => {
     setImages({ ...CLINIC_IMAGES });
+    try {
+      const snap = await getDocs(collection(db, 'site_images'));
+      const deletions = snap.docs.map((d) => deleteDoc(d.ref));
+      await Promise.all(deletions);
+    } catch (e) {
+      console.warn('Could not reset all images in Firestore:', e);
+    }
   };
 
-  const resetAllToDefault = () => {
+  const resetAllToDefault = async () => {
     setImages({ ...CLINIC_IMAGES });
     setClinicInfo({ ...CLINIC_INFO });
     setAnnouncement({ ...DEFAULT_ANNOUNCEMENT });
     try {
       localStorage.removeItem(STORAGE_KEY);
+      const snap = await getDocs(collection(db, 'site_images'));
+      const deletions = snap.docs.map((d) => deleteDoc(d.ref));
+      await Promise.all(deletions);
+      await deleteDoc(doc(db, 'site_config', 'main'));
     } catch {
       // ignore
     }
@@ -354,6 +580,8 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         importSettingsJSON,
         hasCustomChanges,
         lastSavedAt,
+        cloudSyncStatus,
+        syncToCloud,
       }}
     >
       {children}

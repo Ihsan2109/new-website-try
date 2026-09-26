@@ -1,0 +1,60 @@
+{
+  "entities": {
+    "site_config": {
+      "title": "Site Configuration",
+      "description": "Global website images, clinic details, and announcement configuration synchronized across all devices.",
+      "type": "object",
+      "properties": {
+        "images": {
+          "type": "object",
+          "description": "Image URLs for clinic banners, doctor photo, treatments, and before-after photos"
+        },
+        "clinicInfo": {
+          "type": "object",
+          "description": "Clinic address, contact numbers, hours, doctor qualifications"
+        },
+        "announcement": {
+          "type": "object",
+          "description": "Top announcement banner configuration"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "ISO timestamp of last update"
+        }
+      },
+      "required": ["images", "clinicInfo", "announcement"]
+    },
+    "site_images": {
+      "title": "Site Image Override",
+      "description": "Individual photo override stored per key to avoid Firestore document size limits",
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string",
+          "description": "Image URL or compressed data URL"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "ISO timestamp of last update"
+        }
+      },
+      "required": ["url"]
+    }
+  },
+  "firestore": {
+    "/site_config/{configId}": {
+      "entity": "site_config",
+      "security": {
+        "read": "true",
+        "write": "true"
+      }
+    },
+    "/site_images/{imageId}": {
+      "entity": "site_images",
+      "security": {
+        "read": "true",
+        "write": "true"
+      }
+    }
+  }
+}
